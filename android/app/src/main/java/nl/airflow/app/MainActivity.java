@@ -12,16 +12,15 @@ public class MainActivity extends Activity {
  int red=0xfff9373f; int bg=0xff050507;
  android.graphics.drawable.GradientDrawable rounded(int color,int radius){android.graphics.drawable.GradientDrawable d=new android.graphics.drawable.GradientDrawable();d.setColor(color);d.setCornerRadius(dp(radius));return d;}
  class RadarView extends View {
- final Paint p=new Paint(Paint.ANTI_ALIAS_FLAG);final Matrix matrix=new Matrix();ValueAnimator rotation;float degrees=0;
+ final Paint p=new Paint(Paint.ANTI_ALIAS_FLAG);ValueAnimator pulse;float phase=0;
  RadarView(Context c){super(c);setLayerType(View.LAYER_TYPE_SOFTWARE,null);}
- @Override protected void onAttachedToWindow(){super.onAttachedToWindow();rotation=ValueAnimator.ofFloat(0f,360f);rotation.setDuration(4200);rotation.setRepeatCount(ValueAnimator.INFINITE);rotation.setInterpolator(new LinearInterpolator());rotation.addUpdateListener(a->{degrees=(float)a.getAnimatedValue();invalidate();});rotation.start();}
- @Override protected void onDetachedFromWindow(){if(rotation!=null){rotation.cancel();rotation=null;}super.onDetachedFromWindow();}
+ @Override protected void onAttachedToWindow(){super.onAttachedToWindow();pulse=ValueAnimator.ofFloat(0f,1f);pulse.setDuration(2600);pulse.setRepeatCount(ValueAnimator.INFINITE);pulse.setInterpolator(new LinearInterpolator());pulse.addUpdateListener(a->{phase=(float)a.getAnimatedValue();invalidate();});pulse.start();}
+ @Override protected void onDetachedFromWindow(){if(pulse!=null){pulse.cancel();pulse=null;}super.onDetachedFromWindow();}
  @Override protected void onDraw(Canvas c){super.onDraw(c);float cx=getWidth()/2f,cy=getHeight()/2f,r=Math.min(cx,cy)-dp(8);
- p.setShader(null);p.setStyle(Paint.Style.FILL);p.setColor(0x100e0010);c.drawCircle(cx,cy,r,p);
- p.setStyle(Paint.Style.FILL);SweepGradient sweep=new SweepGradient(cx,cy,new int[]{0x00f9373f,0x05f9373f,0x22f9373f,0x66f9373f,0x00f9373f},new float[]{0f,0.3f,0.7f,0.995f,1f});matrix.setRotate(degrees,cx,cy);sweep.setLocalMatrix(matrix);p.setShader(sweep);c.drawCircle(cx,cy,r,p);p.setShader(null);
- p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(dp(1));for(float f:new float[]{1f,0.78f,0.56f,0.34f}){p.setColor(f==1f?0x99f9373f:0x66f9373f);c.drawCircle(cx,cy,r*f,p);}
- c.save();c.rotate(degrees,cx,cy);p.setColor(0xbbf9373f);p.setStrokeWidth(dp(2));c.drawLine(cx,cy,cx+r,cy,p);c.restore();
- p.setStyle(Paint.Style.FILL);p.setColor(0xfff9373f);c.drawCircle(cx,cy,dp(3),p);
+ p.setShader(null);p.setStyle(Paint.Style.FILL);p.setColor(0x0c290009);c.drawCircle(cx,cy,r,p);
+ p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(dp(1.5f));float[] rings={1f,0.78f,0.56f,0.34f};for(int i=0;i<rings.length;i++){float glow=(float)(0.5+0.5*Math.sin(phase*Math.PI*2-i*0.9));p.setColor(Color.argb((int)(45+glow*90),249,55,63));c.drawCircle(cx,cy,r*rings[i],p);}
+ for(int i=0;i<2;i++){float t=(phase+i*0.5f)%1f;float radius=r*(0.12f+0.88f*t);p.setStrokeWidth(dp(1.8f));p.setColor(Color.argb((int)(105*(1-t)),249,55,63));c.drawCircle(cx,cy,radius,p);}
+ p.setStyle(Paint.Style.FILL);p.setColor(0x22f9373f);c.drawCircle(cx,cy,dp(19)+dp(5)*(float)Math.sin(phase*Math.PI*2),p);p.setColor(0xfff9373f);c.drawCircle(cx,cy,dp(8),p);
  }
  }
  void buildUi(){
