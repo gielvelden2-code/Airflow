@@ -1,6 +1,6 @@
 package nl.airflow.app;
 
-import android.app.*;import android.os.*;import android.content.*;import android.net.Uri;import android.net.nsd.*;import android.net.wifi.WifiManager;import android.graphics.Color;import android.provider.MediaStore;import android.provider.OpenableColumns;import android.content.ContentValues;import android.os.Environment;import android.webkit.MimeTypeMap;import android.graphics.Typeface;import android.view.*;import android.widget.*;import java.io.*;import java.net.*;import java.util.*;import java.util.concurrent.*;
+import android.app.*;import android.os.*;import android.content.*;import android.net.Uri;import android.net.nsd.*;import android.net.wifi.WifiManager;import android.graphics.Color;import android.graphics.Canvas;import android.graphics.Paint;import android.graphics.SweepGradient;import android.graphics.Matrix;import android.animation.ValueAnimator;import android.view.animation.LinearInterpolator;import android.provider.MediaStore;import android.provider.OpenableColumns;import android.content.ContentValues;import android.os.Environment;import android.webkit.MimeTypeMap;import android.graphics.Typeface;import android.view.*;import android.widget.*;import java.io.*;import java.net.*;import java.util.*;import java.util.concurrent.*;
 
 public class MainActivity extends Activity {
  final ExecutorService io=Executors.newCachedThreadPool(); final Map<String,InetSocketAddress> devices=new ConcurrentHashMap<>();
@@ -11,6 +11,19 @@ public class MainActivity extends Activity {
  TextView text(String value,int size){TextView t=new TextView(this);t.setText(value);t.setTextColor(Color.WHITE);t.setTextSize(size);t.setGravity(Gravity.CENTER);return t;}
  int red=0xfff9373f; int bg=0xff050507;
  android.graphics.drawable.GradientDrawable rounded(int color,int radius){android.graphics.drawable.GradientDrawable d=new android.graphics.drawable.GradientDrawable();d.setColor(color);d.setCornerRadius(dp(radius));return d;}
+ class RadarView extends View {
+ final Paint p=new Paint(Paint.ANTI_ALIAS_FLAG);final Matrix matrix=new Matrix();ValueAnimator rotation;float degrees=0;
+ RadarView(Context c){super(c);setLayerType(View.LAYER_TYPE_SOFTWARE,null);}
+ @Override protected void onAttachedToWindow(){super.onAttachedToWindow();rotation=ValueAnimator.ofFloat(0f,360f);rotation.setDuration(4200);rotation.setRepeatCount(ValueAnimator.INFINITE);rotation.setInterpolator(new LinearInterpolator());rotation.addUpdateListener(a->{degrees=(float)a.getAnimatedValue();invalidate();});rotation.start();}
+ @Override protected void onDetachedFromWindow(){if(rotation!=null){rotation.cancel();rotation=null;}super.onDetachedFromWindow();}
+ @Override protected void onDraw(Canvas c){super.onDraw(c);float cx=getWidth()/2f,cy=getHeight()/2f,r=Math.min(cx,cy)-dp(8);
+ p.setShader(null);p.setStyle(Paint.Style.FILL);p.setColor(0x100e0010);c.drawCircle(cx,cy,r,p);
+ p.setStyle(Paint.Style.FILL);SweepGradient sweep=new SweepGradient(cx,cy,new int[]{0x00f9373f,0x05f9373f,0x22f9373f,0x66f9373f,0x00f9373f},new float[]{0f,0.3f,0.7f,0.995f,1f});matrix.setRotate(degrees,cx,cy);sweep.setLocalMatrix(matrix);p.setShader(sweep);c.drawCircle(cx,cy,r,p);p.setShader(null);
+ p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(dp(1));for(float f:new float[]{1f,0.78f,0.56f,0.34f}){p.setColor(f==1f?0x99f9373f:0x66f9373f);c.drawCircle(cx,cy,r*f,p);}
+ c.save();c.rotate(degrees,cx,cy);p.setColor(0xbbf9373f);p.setStrokeWidth(dp(2));c.drawLine(cx,cy,cx+r,cy,p);c.restore();
+ p.setStyle(Paint.Style.FILL);p.setColor(0xfff9373f);c.drawCircle(cx,cy,dp(3),p);
+ }
+ }
  void buildUi(){
  ScrollView scroll=new ScrollView(this);scroll.setFillViewport(true);scroll.setBackgroundColor(bg);
  LinearLayout root=new LinearLayout(this);root.setOrientation(1);root.setGravity(Gravity.CENTER_HORIZONTAL);root.setPadding(dp(22),dp(30),dp(22),dp(28));scroll.addView(root);
@@ -19,8 +32,7 @@ public class MainActivity extends Activity {
  ImageView logo=new ImageView(this);logo.setImageResource(nl.airflow.app.R.drawable.airflow_mark);logo.setScaleType(ImageView.ScaleType.FIT_CENTER);LinearLayout.LayoutParams logoLp=new LinearLayout.LayoutParams(dp(104),dp(100));logoLp.topMargin=dp(24);root.addView(logo,logoLp);
  TextView title=text("AirFlow",34);title.setTypeface(null,Typeface.BOLD);root.addView(title);
  TextView hint=text("Zoekt naar apparaten in de buurt…",14);hint.setTextColor(0xffcccccc);LinearLayout.LayoutParams hintLp=new LinearLayout.LayoutParams(-1,dp(42));hintLp.topMargin=dp(8);root.addView(hint,hintLp);
- android.widget.FrameLayout radar=new android.widget.FrameLayout(this);LinearLayout.LayoutParams radarLp=new LinearLayout.LayoutParams(dp(285),dp(285));radarLp.topMargin=dp(8);radarLp.bottomMargin=dp(14);root.addView(radar,radarLp);
- for(int diameter:new int[]{270,210,150,90}){android.graphics.drawable.GradientDrawable circle=new android.graphics.drawable.GradientDrawable();circle.setShape(android.graphics.drawable.GradientDrawable.OVAL);circle.setColor(diameter==270?0x160f0010:0x09000000);circle.setStroke(dp(1),diameter==270?0x66f9373f:0x99f9373f);android.widget.FrameLayout.LayoutParams lp=new android.widget.FrameLayout.LayoutParams(dp(diameter),dp(diameter),Gravity.CENTER);radar.addView(new View(this),lp);View ring=radar.getChildAt(radar.getChildCount()-1);ring.setBackground(circle);}
+ RadarView radar=new RadarView(this);LinearLayout.LayoutParams radarLp=new LinearLayout.LayoutParams(dp(285),dp(285));radarLp.topMargin=dp(8);radarLp.bottomMargin=dp(14);root.addView(radar,radarLp);
  TextView devicesTitle=text("Apparaten in de buurt",18);devicesTitle.setTypeface(null,Typeface.BOLD);root.addView(devicesTitle);
  list=new LinearLayout(this);list.setOrientation(1);list.setGravity(Gravity.CENTER);LinearLayout.LayoutParams listLp=new LinearLayout.LayoutParams(-1,-2);listLp.topMargin=dp(12);root.addView(list,listLp);
  status=text("Zorg dat beide apparaten op dezelfde wifi zitten.",13);status.setTextColor(0xffaaaaaa);LinearLayout.LayoutParams statusLp=new LinearLayout.LayoutParams(-1,-2);statusLp.topMargin=dp(12);root.addView(status,statusLp);
