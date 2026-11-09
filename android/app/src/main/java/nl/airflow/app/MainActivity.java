@@ -14,6 +14,7 @@ public class MainActivity extends Activity {
   web.getSettings().setJavaScriptEnabled(true);
   web.getSettings().setDomStorageEnabled(true);
   web.getSettings().setAllowFileAccess(false);
+  web.addJavascriptInterface(new Object(){@android.webkit.JavascriptInterface public void shareLink(String url){runOnUiThread(()->{if(!url.startsWith("https://gielvelden2-code.github.io/Airflow/"))return;Intent share=new Intent(Intent.ACTION_SEND);share.setType("text/plain");share.putExtra(Intent.EXTRA_TEXT,url);startActivity(Intent.createChooser(share,"Deel AirFlow-link"));});}},"AirFlowNative");
   web.setWebViewClient(new android.webkit.WebViewClient());
   web.setWebChromeClient(new android.webkit.WebChromeClient(){
    @Override public boolean onShowFileChooser(android.webkit.WebView w,android.webkit.ValueCallback<Uri[]> callback,FileChooserParams params){
