@@ -6,7 +6,36 @@ public class MainActivity extends Activity {
  final ExecutorService io=Executors.newCachedThreadPool(); final Map<String,InetSocketAddress> devices=new ConcurrentHashMap<>();
  NsdManager nsd; NsdManager.DiscoveryListener discovery; NsdManager.RegistrationListener registration; ServerSocket server; WifiManager.MulticastLock multicast; LinearLayout list; TextView status; Uri selected;
  final String serviceType="_airflow._tcp."; String deviceName="AirFlow-"+Build.MODEL.replaceAll("[^a-zA-Z0-9]","").substring(0,Math.min(12,Build.MODEL.replaceAll("[^a-zA-Z0-9]","").length()));
- @Override public void onCreate(Bundle b){super.onCreate(b);getWindow().setStatusBarColor(Color.BLACK);getWindow().setNavigationBarColor(Color.BLACK);getWindow().getDecorView().setSystemUiVisibility(0);buildUi();nsd=(NsdManager)getSystemService(NSD_SERVICE);WifiManager wifi=(WifiManager)getApplicationContext().getSystemService(WIFI_SERVICE);multicast=wifi.createMulticastLock("airflow-nsd");multicast.setReferenceCounted(false);multicast.acquire();startServer();discover();Intent intent=getIntent();if(Intent.ACTION_SEND.equals(intent.getAction())){selected=intent.getParcelableExtra(Intent.EXTRA_STREAM);if(selected!=null)setStatus("Bestand geselecteerd. Tik op een apparaat.");}}
+ @Override public void onCreate(Bundle b){super.onCreate(b);getWindow().setStatusBarColor(Color.BLACK);getWindow().setNavigationBarColor(Color.BLACK);getWindow().getDecorView().setSystemUiVisibility(0);openCrossPlatform();nsd=(NsdManager)getSystemService(NSD_SERVICE);WifiManager wifi=(WifiManager)getApplicationContext().getSystemService(WIFI_SERVICE);multicast=wifi.createMulticastLock("airflow-nsd");multicast.setReferenceCounted(false);multicast.acquire();/* WebView uses the same discovery and transfer protocol as iOS browsers. */ Intent intent=getIntent();if(Intent.ACTION_SEND.equals(intent.getAction())){selected=intent.getParcelableExtra(Intent.EXTRA_STREAM);if(selected!=null)setStatus("Bestand geselecteerd. Tik op een apparaat.");}}
+
+ void openCrossPlatform(){
+  android.webkit.WebView web=new android.webkit.WebView(this);
+  web.setBackgroundColor(bg);
+  web.getSettings().setJavaScriptEnabled(true);
+  web.getSettings().setDomStorageEnabled(true);
+  web.getSettings().setAllowFileAccess(false);
+  web.setWebViewClient(new android.webkit.WebViewClient());
+  web.setWebChromeClient(new android.webkit.WebChromeClient(){
+   @Override public boolean onShowFileChooser(android.webkit.WebView w,android.webkit.ValueCallback<Uri[]> callback,FileChooserParams params){
+    if(pendingFiles!=null)pendingFiles.onReceiveValue(null);
+    pendingFiles=callback;
+    try{Intent picker=params.createIntent();startActivityForResult(picker,2718);return true;}
+    catch(Exception e){pendingFiles=null;callback.onReceiveValue(null);return false;}
+   }
+  });
+  web.setDownloadListener((url,userAgent,disposition,mime,length)->{
+   try{android.app.DownloadManager.Request request=new android.app.DownloadManager.Request(Uri.parse(url));
+    request.setNotificationVisibility(android.app.DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
+    request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS,"AirFlow-"+System.currentTimeMillis());
+    ((android.app.DownloadManager)getSystemService(DOWNLOAD_SERVICE)).enqueue(request);
+    Toast.makeText(this,"Download gestart",Toast.LENGTH_SHORT).show();
+   }catch(Exception e){Toast.makeText(this,"Open het bestand in je browser om op te slaan.",Toast.LENGTH_LONG).show();}
+  });
+  setContentView(web);
+  web.loadUrl("https://gielvelden2-code.github.io/Airflow/");
+ }
+ android.webkit.ValueCallback<Uri[]> pendingFiles;
+ @Override protected void onActivityResult(int request,int result,Intent data){super.onActivityResult(request,result,data);if(request==2718&&pendingFiles!=null){pendingFiles.onReceiveValue(android.webkit.WebChromeClient.FileChooserParams.parseResult(result,data));pendingFiles=null;}}
  int dp(float v){return (int)(v*getResources().getDisplayMetrics().density);} void setStatus(String s){runOnUiThread(()->status.setText(s));}
  TextView text(String value,int size){TextView t=new TextView(this);t.setText(value);t.setTextColor(Color.WHITE);t.setTextSize(size);t.setGravity(Gravity.CENTER);return t;}
  int red=0xfff9373f; int bg=0xff050507;
