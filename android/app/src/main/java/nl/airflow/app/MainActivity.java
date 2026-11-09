@@ -4,18 +4,26 @@ import android.app.*;import android.os.*;import android.content.*;import android
 
 public class MainActivity extends Activity {
  final ExecutorService io=Executors.newCachedThreadPool(); final Map<String,InetSocketAddress> devices=new ConcurrentHashMap<>();
- NsdManager nsd; NsdManager.DiscoveryListener discovery; NsdManager.RegistrationListener registration; ServerSocket server; WifiManager.MulticastLock multicast; LinearLayout list; TextView status; Uri selected;
+ NsdManager nsd; NsdManager.DiscoveryListener discovery; NsdManager.RegistrationListener registration; ServerSocket server; WifiManager.MulticastLock multicast; LinearLayout list; TextView status; Uri selected; android.webkit.WebView webView; final ArrayList<Uri> sharedUris=new ArrayList<>();
  final String serviceType="_airflow._tcp."; String deviceName="AirFlow-"+Build.MODEL.replaceAll("[^a-zA-Z0-9]","").substring(0,Math.min(12,Build.MODEL.replaceAll("[^a-zA-Z0-9]","").length()));
- @Override public void onCreate(Bundle b){super.onCreate(b);getWindow().setStatusBarColor(Color.BLACK);getWindow().setNavigationBarColor(Color.BLACK);getWindow().getDecorView().setSystemUiVisibility(0);openCrossPlatform();nsd=(NsdManager)getSystemService(NSD_SERVICE);WifiManager wifi=(WifiManager)getApplicationContext().getSystemService(WIFI_SERVICE);multicast=wifi.createMulticastLock("airflow-nsd");multicast.setReferenceCounted(false);multicast.acquire();/* WebView uses the same discovery and transfer protocol as iOS browsers. */ Intent intent=getIntent();if(Intent.ACTION_SEND.equals(intent.getAction())){selected=intent.getParcelableExtra(Intent.EXTRA_STREAM);if(selected!=null)setStatus("Bestand geselecteerd. Tik op een apparaat.");}}
+ @Override public void onCreate(Bundle b){super.onCreate(b);getWindow().setStatusBarColor(Color.BLACK);getWindow().setNavigationBarColor(Color.BLACK);getWindow().getDecorView().setSystemUiVisibility(0);collectSharedFiles(getIntent());openCrossPlatform();}
+ @Override protected void onNewIntent(Intent intent){super.onNewIntent(intent);setIntent(intent);collectSharedFiles(intent);if(webView!=null)webView.evaluateJavascript("window.airflowLoadNativeShare&&window.airflowLoadNativeShare()",null);}
+ void collectSharedFiles(Intent intent){if(intent==null)return;String action=intent.getAction();if(Intent.ACTION_SEND.equals(action)){Uri uri=intent.getParcelableExtra(Intent.EXTRA_STREAM);if(uri!=null)sharedUris.add(uri);}else if(Intent.ACTION_SEND_MULTIPLE.equals(action)){ArrayList<Uri> uris=intent.getParcelableArrayListExtra(Intent.EXTRA_STREAM);if(uris!=null)sharedUris.addAll(uris);}}
 
  void openCrossPlatform(){
-  android.webkit.WebView web=new android.webkit.WebView(this);
+  android.webkit.WebView web=new android.webkit.WebView(this);webView=web;
   web.setBackgroundColor(bg);
   web.getSettings().setJavaScriptEnabled(true);
   web.getSettings().setDomStorageEnabled(true);
   web.getSettings().setAllowFileAccess(false);
-  web.addJavascriptInterface(new Object(){@android.webkit.JavascriptInterface public void shareLink(String url){runOnUiThread(()->{if(!url.startsWith("https://gielvelden2-code.github.io/Airflow/"))return;Intent share=new Intent(Intent.ACTION_SEND);share.setType("text/plain");share.putExtra(Intent.EXTRA_TEXT,url);startActivity(Intent.createChooser(share,"Deel AirFlow-link"));});}},"AirFlowNative");
-  web.setWebViewClient(new android.webkit.WebViewClient());
+  web.addJavascriptInterface(new Object(){@android.webkit.JavascriptInterface public void shareLink(String url){runOnUiThread(()->{if(!url.startsWith("https://gielvelden2-code.github.io/Airflow/"))return;Intent share=new Intent(Intent.ACTION_SEND);share.setType("text/plain");share.putExtra(Intent.EXTRA_TEXT,url);startActivity(Intent.createChooser(share,"Deel AirFlow-link"));});}
+   @android.webkit.JavascriptInterface public int sharedCount(){return sharedUris.size();}
+   @android.webkit.JavascriptInterface public String sharedName(int index){if(index<0||index>=sharedUris.size())return "";Uri u=sharedUris.get(index);String name="foto-"+index+".jpg";try(android.database.Cursor c=getContentResolver().query(u,new String[]{OpenableColumns.DISPLAY_NAME},null,null,null)){if(c!=null&&c.moveToFirst())name=c.getString(0);}catch(Exception ignored){}return name;}
+   @android.webkit.JavascriptInterface public String sharedType(int index){if(index<0||index>=sharedUris.size())return "";String type=getContentResolver().getType(sharedUris.get(index));return type==null?"application/octet-stream":type;}
+   @android.webkit.JavascriptInterface public String sharedData(int index){if(index<0||index>=sharedUris.size())return "";try(InputStream in=getContentResolver().openInputStream(sharedUris.get(index));ByteArrayOutputStream out=new ByteArrayOutputStream()){byte[] buf=new byte[32768];int n;while((n=in.read(buf))!=-1){out.write(buf,0,n);if(out.size()>25*1024*1024)return "";}return android.util.Base64.encodeToString(out.toByteArray(),android.util.Base64.NO_WRAP);}catch(Exception e){return "";}}
+   @android.webkit.JavascriptInterface public void clearShared(){sharedUris.clear();}
+  },"AirFlowNative");
+  web.setWebViewClient(new android.webkit.WebViewClient(){@Override public void onPageFinished(android.webkit.WebView view,String url){view.evaluateJavascript("window.airflowLoadNativeShare&&window.airflowLoadNativeShare()",null);}});
   web.setWebChromeClient(new android.webkit.WebChromeClient(){
    @Override public boolean onShowFileChooser(android.webkit.WebView w,android.webkit.ValueCallback<Uri[]> callback,FileChooserParams params){
     if(pendingFiles!=null)pendingFiles.onReceiveValue(null);
